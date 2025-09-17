@@ -1,3 +1,4 @@
 Flask==3.1.2
-llama_parse==0.6.66
+llama_cloud_services==0.6.67
+pymongo==4.15.1
 python-dotenv==1.1.1
