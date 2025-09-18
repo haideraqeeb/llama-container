@@ -2,3 +2,5 @@ Flask==3.1.2
 llama_cloud_services==0.6.67
 pymongo==4.15.1
 python-dotenv==1.1.1
+torch==2.8.0
+transformers==4.56.1

@@ -3,6 +3,7 @@ import base64
 import traceback
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from transformers import pipeline
 from flask import Flask, request, jsonify
 from llama_cloud_services import LlamaParse
 
@@ -16,7 +17,14 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 MONGO_CONNECTION_STRING = os.getenv("MONGO_CONNECTION_STRING")
 LLAMA_CLOUD_API_KEY = os.environ.get("LLAMA_CLOUD_API_KEY")
 
-MAX_SIZE = 20 * 1024 * 1024  
+MAX_SIZE = 20 * 1024 * 1024
+
+classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+def detect_ai_or_human(text):
+    labels = ["AI-Generated", "Human-Written"]
+    results = classifier(text, candidate_labels=labels)
+    return results["labels"][0], float(results["scores"][0])
 
 @app.route('/')
 def index():
@@ -195,6 +203,25 @@ def clean_uploads():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/detect", methods=["POST"])
+def detect():
+    data = request.get_json()
+
+    if not data or "text" not in data:
+        return jsonify({"error": "Invalid request. Please provide 'text' field."}), 400
+
+    text = data["text"]
+    label, score = detect_ai_or_human(text)
+
+    score = int(score * 10)
+
+    return jsonify({
+        "label": label,
+        "score": score
+    })
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
