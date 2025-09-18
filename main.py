@@ -157,26 +157,55 @@ def get_teams():
     try:
         client = MongoClient(MONGO_CONNECTION_STRING)
         db = client['sih-reg']
-        collection = db['teams']
+        teams_collection = db['teams']
+        ps_collection = db['problemstatements']
 
         teams_data = []
-        for team in collection.find({}, { 'teamName': 1, 'tasks.files': 1, '_id': 0 }):
+        for team in teams_collection.find({}, { 'teamName': 1, 'tasks.files': 1, 'problemStatement': 1, '_id': 0 }):
             ppt_links = []
             if 'tasks' in team:
                 for task in team['tasks']:
                     if 'files' in task and task['files']:
                         ppt_links.extend(task['files'])
-                        
-            
-            if ppt_links:
-                teams_data.append({
-                    'teamName': team.get('teamName'),
-                    'pptLinks': ppt_links
-                })
+
+            # Return the object that is two down from teamName (problemStatement as string if ObjectId)
+            from bson import ObjectId
+            ps = team.get('problemStatement')
+            ps_id = None
+            if isinstance(ps, ObjectId):
+                ps_id = ps
+                ps = str(ps)
+            elif isinstance(ps, dict) and '$oid' in ps:
+                ps_id = ObjectId(ps['$oid'])
+                ps = ps['$oid']
+            elif isinstance(ps, str):
+                try:
+                    ps_id = ObjectId(ps)
+                except Exception:
+                    ps_id = None
+
+            # Fetch the title from problemstatements collection
+            ps_title = None
+            ps_description = None
+            if ps_id:
+                ps_obj = ps_collection.find_one({'_id': ps_id})
+                if ps_obj:
+                    if 'title' in ps_obj:
+                        ps_title = ps_obj['title']
+                    if 'description' in ps_obj:
+                        ps_description = ps_obj['description']
+
+            team_data = {
+                'teamName': team.get('teamName'),
+                'pptLinks': ppt_links,
+                'problemStatement': ps,
+                'psTitle': ps_title,
+                'psDescription': ps_description
+            }
+            teams_data.append(team_data)
 
         client.close()
         return jsonify(teams_data), 200
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
